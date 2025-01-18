@@ -3,11 +3,13 @@ $host.ui.RawUI.WindowTitle = "CHHViewer - Made by Neight01 and Johannes Schwein"
 Clear-Host
 Write-Host "";
 Write-Host -ForegroundColor Magenta @"
-      ________  ____  __ _    ___                       
-     / ____/ / / / / / /| |  / (_)__ _      _____  _____
-    / /   / /_/ / /_/ / | | / / / _ \ | /| / / _ \/ ___/
-   / /___/ __  / __  /  | |/ / /  __/ |/ |/ /  __/ /    
-   \____/_/ /_/_/ /_/   |___/_/\___/|__/|__/\___/_/     
+
+   __  __     ___                     _                        
+   \ \/ _\   / __\ /\  /\/\  /\/\   /(_) _____      _____ _ __ 
+    \ \ \   / /   / /_/ / /_/ /\ \ / / |/ _ \ \ /\ / / _ \ '__|
+ /\_/ /\ \ / /___/ __  / __  /  \ V /| |  __/\ V  V /  __/ |   
+ \___/\__/ \____/\/ /_/\/ /_/    \_/ |_|\___| \_/\_/ \___|_|   
+                                                               
 "@;
 Write-Host -ForegroundColor White "CHHViewer - Made by Neight01 and Johannes Schwein - " -NoNewLine
 Write-Host -ForegroundColor White "https://aquila.mt/jsnet/neight";
