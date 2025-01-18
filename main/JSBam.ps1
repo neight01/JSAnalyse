@@ -38,12 +38,12 @@ Clear-Host
 
 Write-Host "";
 Write-Host "";
-Write-Host -ForegroundColor Red "   __    ___        _        __    __  __   __  __    ___         __    __  __ _____    __     ___    _           ";
-Write-Host -ForegroundColor Red "   \ \  /___\/\  /\/_\    /\ \ \/\ \ \/__\ / _\/ _\  / __\ /\  /\/ / /\ \ \/__\\_   \/\ \ \   / __\  /_\    /\/\  ";
-Write-Host -ForegroundColor Red "    \ \//  // /_/ //_\\  /  \/ /  \/ /_\   \ \ \ \  / /   / /_/ /\ \/  \/ /_\   / /\/  \/ /  /__\// //_\\  /    \ ";
-Write-Host -ForegroundColor Red " /\_/ / \_// __  /  _  \/ /\  / /\  //__   _\ \_\ \/ /___/ __  /  \  /\  //__/\/ /_/ /\  /  / \/  \/  _  \/ /\/\ \";
-Write-Host -ForegroundColor Red " \___/\___/\/ /_/\_/ \_/\_\ \/\_\ \/\__/   \__/\__/\____/\/ /_/    \/  \/\__/\____/\_\ \/   \_____/\_/ \_/\/    \/";
-Write-Host -ForegroundColor Red "                                                                                                                  ";
+Write-Host -ForegroundColor Red "   __    ___        _        __    __  __  __   __    ___         __    __  __ _____    __     ___    _           ";
+Write-Host -ForegroundColor Red "   \ \  /___\/\  /\/_\    /\ \ \/\ \ \/__\/ _\ / _\  / __\ /\  /\/ / /\ \ \/__\\_   \/\ \ \   / __\  /_\    /\/\  ";
+Write-Host -ForegroundColor Red "    \ \//  // /_/ //_\\  /  \/ /  \/ /_\  \ \  \ \  / /   / /_/ /\ \/  \/ /_\   / /\/  \/ /  /__\// //_\\  /    \ ";
+Write-Host -ForegroundColor Red " /\_/ / \_// __  /  _  \/ /\  / /\  //__  _\ \ _\ \/ /___/ __  /  \  /\  //__/\/ /_/ /\  /  / \/  \/  _  \/ /\/\ \";
+Write-Host -ForegroundColor Red " \___/\___/\/ /_/\_/ \_/\_\ \/\_\ \/\__/  \__/ \__/\____/\/ /_/    \/  \/\__/\____/\_\ \/   \_____/\_/ \_/\/    \/";
+Write-Host -ForegroundColor Red "                                                                                                                   ";
 Write-Host "";
 Write-Host -ForegroundColor Blue "   Made By Neight01" -NoNewLine
 Write-Host "";
