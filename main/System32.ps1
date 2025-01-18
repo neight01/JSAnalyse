@@ -9,7 +9,7 @@ Write-Host @"
               |___/                                  
 " -ForegroundColor Magenta
 
-Write-Host "Made by Neight01 for Johannes Schwein Analysen`n"
+Write-Host "Made by Neight01`n"
 
 $system32Path = "$env:SystemRoot\System32"
 
