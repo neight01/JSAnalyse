@@ -1,15 +1,20 @@
 Clear-Host
 Clear-Host
 Write-Host @"
+[38;2;160;32;240;48;2m
+
    __  __  __           _                 _________  
    \ \/ _\/ _\_   _ ___| |_ ___ _ __ ___ |___ /___ \ 
     \ \ \ \ \| | | / __| __/ _ \ '_ ` _ \  |_ \ __) |
  /\_/ /\ \_\ \ |_| \__ \ ||  __/ | | | | |___) / __/ 
- \___/\__/\__/\__, |___/\__\___|_| |_| |_|____/_____| 
-              |___/                                  
-" -ForegroundColor Magenta
+ \___/\__/\__/\__, |___/\__\___|_| |_| |_|____/_____|
+              |___/                                  [0m
+                                            
+                                            
 
-Write-Host "Made by Neight01`n"
+"@ -ForegroundColor Magenta
+
+Write-Host "Made by Neight01 for Johannes Schwein Analysen`n"
 
 $system32Path = "$env:SystemRoot\System32"
 
