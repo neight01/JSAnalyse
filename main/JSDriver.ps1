@@ -71,12 +71,12 @@ $Tasks = @{
 # -------------------------
 function Show-AsciiHeader {
     Clear-Host
-    # ASCII Art (wie gewünscht)
-    Write-Host "   __  __  __   _____  ___     __  _   _____         __    __ " -ForegroundColor Cyan
-    Write-Host "   \ \/ _\/ _\  \_   \/ _ \ /\ \ \/_\ /__   \/\ /\  /__\  /__\" -ForegroundColor Cyan
-    Write-Host "    \ \ \ \ \    / /\/ /_\//  \/ //_\\  / /\/ / \ \/ \// /_\  " -ForegroundColor Cyan
-    Write-Host " /\_/ /\ \_\ \/\/ /_/ /_\\/ /\  /  _  \/ /  \ \_/ / _  \//__  " -ForegroundColor Cyan
-    Write-Host " \___/\__/\__/\____/\____/\_\ \/\_/ \_/\/    \___/\/ \_/\__/  " -ForegroundColor Cyan
+   Write-Host " __  __    ___      _                  " -ForegroundColor Cyan
+   Write-Host " \ \/ _\  /   \_ __(_)_   _____ _ __   " -ForegroundColor Cyan
+   Write-Host "  \ \ \  / /\ / '__| \ \ / / _ \ '__|  " -ForegroundColor Cyan
+   Write-Host " /\_/ /\ \/ /_//| |  | |\ V /  __/ |   " -ForegroundColor Cyan
+   Write-Host " \___/\__/___,' |_|  |_| \_/ \___|_|   " -ForegroundColor Cyan
+                                       
     Write-Host ""
     Write-Host "               JSDriver by Neight01" -ForegroundColor Yellow
 }
