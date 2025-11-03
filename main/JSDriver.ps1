@@ -1,4 +1,4 @@
-# JSAnalyse_Menu.ps1
+# JSDriver_Menu.ps1
 # Interaktives Sammel-Skript für System- und Sicherheitsrelevante Infos.
 # Als Administrator ausführen!
 
@@ -6,7 +6,7 @@
 # Setup: Ausgabepfad & Hilfsfunktionen
 # -------------------------
 $timestamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
-$outDir = "$env:USERPROFILE\Desktop\JSAnalyse_$timestamp"
+$outDir = "$env:USERPROFILE\Desktop\JSDriver_$timestamp"
 New-Item -Path $outDir -ItemType Directory -Force | Out-Null
 
 function Save-Output($name, $scriptblock) {
@@ -69,10 +69,22 @@ $Tasks = @{
 # -------------------------
 # Menu-Funktionen
 # -------------------------
+function Show-AsciiHeader {
+    Clear-Host
+    # ASCII Art (wie gewünscht)
+    Write-Host "   __  __  __   _____  ___     __  _   _____         __    __ " -ForegroundColor Cyan
+    Write-Host "   \ \/ _\/ _\  \_   \/ _ \ /\ \ \/_\ /__   \/\ /\  /__\  /__\" -ForegroundColor Cyan
+    Write-Host "    \ \ \ \ \    / /\/ /_\//  \/ //_\\  / /\/ / \ \/ \// /_\  " -ForegroundColor Cyan
+    Write-Host " /\_/ /\ \_\ \/\/ /_/ /_\\/ /\  /  _  \/ /  \ \_/ / _  \//__  " -ForegroundColor Cyan
+    Write-Host " \___/\__/\__/\____/\____/\_\ \/\_/ \_/\/    \___/\/ \_/\__/  " -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "               JSDriver by Neight01" -ForegroundColor Yellow
+}
+
 function Show-Header {
     Clear-Host
     Write-Host "=========================================" -ForegroundColor Cyan
-    Write-Host "         JSAnalyse by Neight01           " -ForegroundColor Cyan
+    Write-Host "          JSDriver by Neight01           " -ForegroundColor Cyan
     Write-Host " Ausgabe: $outDir" -ForegroundColor Yellow
     Write-Host " Zeitstempel: $timestamp" -ForegroundColor Yellow
     Write-Host "=========================================" -ForegroundColor Cyan
@@ -132,6 +144,12 @@ function Open-GeneratedFile {
 }
 
 # -------------------------
+# Start: ASCII Header anzeigen, kurz warten, dann Menu
+# -------------------------
+Show-AsciiHeader
+Start-Sleep -Seconds 2
+
+# -------------------------
 # Hauptloop
 # -------------------------
 while ($true) {
@@ -145,6 +163,8 @@ while ($true) {
         }
         '^[aA]$' {
             Run-All
+            # Ordner öffnen nach dem Durchlauf
+            Open-OutputFolder
             Pause
         }
         '^[oO]$' {
@@ -155,7 +175,7 @@ while ($true) {
             Pause
         }
         '^[zZ]$' {
-            $zipPath = Join-Path $env:USERPROFILE\Desktop "JSAnalyse_$timestamp.zip"
+            $zipPath = Join-Path $env:USERPROFILE\Desktop "JSDriver_$timestamp.zip"
             Zip-Results -targetZip $zipPath
             Write-Host "Zip erstellt: $zipPath" -ForegroundColor Cyan
             Pause
@@ -168,4 +188,4 @@ while ($true) {
     }
 }
 
-Write-Host "Beende JSAnalyse. Alle Dateien: $outDir"
+Write-Host "Beende JSDriver. Alle Dateien: $outDir"
