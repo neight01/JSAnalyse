@@ -1,10 +1,3 @@
-# JSDriver_Menu.ps1
-# Interaktives Sammel-Skript für System- und Sicherheitsrelevante Infos.
-# Als Administrator ausführen!
-
-# -------------------------
-# Setup: Ausgabepfad & Hilfsfunktionen
-# -------------------------
 $timestamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
 $outDir = "$env:USERPROFILE\Desktop\JSDriver_$timestamp"
 New-Item -Path $outDir -ItemType Directory -Force | Out-Null
@@ -30,48 +23,34 @@ function Zip-Results {
 
 function Pause() { Write-Host ""; Read-Host "Drücke Enter um fortzufahren..." > $null }
 
-# -------------------------
-# Definiere Tasks (Name -> ScriptBlock)
-# -------------------------
 $Tasks = @{
     "hostname" = { hostname }
     "systeminfo" = { systeminfo }
     "win_bios" = { Get-CimInstance -ClassName Win32_BIOS | Format-List * }
     "computer_system" = { Get-CimInstance -ClassName Win32_ComputerSystem | Format-List * }
-
     "get-process" = { Get-Process | Sort-Object -Property CPU -Descending | Format-Table -AutoSize }
     "tasklist_verbose" = { tasklist /v }
     "services" = { Get-Service | Where-Object {$_.Status -ne 'Stopped'} | Sort-Object Status,Name | Format-Table -AutoSize }
-
     "netstat_ano" = { netstat -ano }
     "net_tcp_connections" = { Get-NetTCPConnection | Sort-Object State -Descending | Format-Table -AutoSize }
     "network_adapters" = { Get-NetAdapter | Format-Table -AutoSize }
     "ip_config" = { ipconfig /all }
-
     "driverquery" = { driverquery /v }
     "signed_drivers" = { Get-CimInstance -ClassName Win32_PnPSignedDriver | Select-Object DeviceName,Manufacturer,DriverVersion,DriverProviderName,DriverDate,Signer | Format-Table -AutoSize }
-
     "event_system" = { Get-WinEvent -LogName System -MaxEvents 500 | Format-List TimeCreated,Id,LevelDisplayName,Message }
     "event_application" = { Get-WinEvent -LogName Application -MaxEvents 500 | Format-List TimeCreated,Id,LevelDisplayName,Message }
     "event_security" = { Get-WinEvent -LogName Security -MaxEvents 200 | Format-List TimeCreated,Id,LevelDisplayName,Message }
-
     "installed_programs" = { Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* , HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* 2>$null | Select-Object DisplayName,DisplayVersion,Publisher,InstallDate | Format-Table -AutoSize }
     "scheduled_tasks" = { schtasks /query /fo LIST /v }
     "autoruns_hint" = { "Wenn Autoruns (Sysinternals) vorhanden ist, führe autoruns.exe /accepteula /nobanner /save <Pfad> aus. Autoruns nicht automatisch heruntergeladen." }
-
     "unsigned_drivers" = { Get-CimInstance -ClassName Win32_PnPSignedDriver | Where-Object {$_.Signer -eq $null -or $_.Signer -eq ""} | Select-Object DeviceName,Manufacturer,DriverVersion,DriverProviderName,DriverDate | Format-Table -AutoSize }
-
     "users" = { Get-CimInstance -ClassName Win32_UserAccount | Format-Table Name,SID,Disabled,LocalAccount -AutoSize }
     "disk_info" = { Get-PhysicalDisk | Format-List *; Get-Volume | Format-Table -AutoSize }
     "installed_updates" = { wmic qfe get HotFixID,InstalledOn,Description /format:table }
 }
 
-# -------------------------
-# Menu-Funktionen
-# -------------------------
 function Show-AsciiHeader {
     Clear-Host
-    # ASCII Art (wie gewünscht)
     Write-Host "    __  __    ___      _                " -ForegroundColor Cyan
     Write-Host "    \ \/ _\  /   \_ __(_)_   _____ _ __ " -ForegroundColor Cyan
     Write-Host "     \ \ \  / /\ / '__| \ \ / / _ \ '__|  " -ForegroundColor Cyan
@@ -143,15 +122,9 @@ function Open-GeneratedFile {
     Start-Process notepad.exe $fileToOpen
 }
 
-# -------------------------
-# Start: ASCII Header anzeigen, kurz warten, dann Menu
-# -------------------------
 Show-AsciiHeader
 Start-Sleep -Seconds 2
 
-# -------------------------
-# Hauptloop
-# -------------------------
 while ($true) {
     Show-Menu
     $choice = Read-Host "Wähle eine Option (Nummer/A/O/F/Z/Q)"
@@ -163,7 +136,6 @@ while ($true) {
         }
         '^[aA]$' {
             Run-All
-            # Ordner öffnen nach dem Durchlauf
             Open-OutputFolder
             Pause
         }
