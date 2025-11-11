@@ -39,9 +39,7 @@ function Score-Matches {
 function Get-AllDriveRoots {
     $roots = @()
     $drives = Get-PSDrive -PSProvider FileSystem
-    foreach ($d in $drives) {
-        if (Test-Path $d.Root) { $roots += $d.Root }
-    }
+    foreach ($d in $drives) { if (Test-Path $d.Root) { $roots += $d.Root } }
     return $roots
 }
 
@@ -115,6 +113,9 @@ $roots = Get-AllDriveRoots
 $fileFindings = Scan-Files-OnRoots -Roots $roots
 $procFindings = Scan-Processes
 
+$fileFindings = $fileFindings | Sort-Object -Property Score -Descending
+$procFindings = $procFindings | Sort-Object -Property Score -Descending
+
 $all = $fileFindings + $procFindings
 if ($all.Count -eq 0) { Write-Host "Keine verdächtigen Triggerbot-Signaturen gefunden." -ForegroundColor Green }
 
@@ -127,7 +128,7 @@ $htmlHeader = @"
 <html>
 <head>
 <meta charset='utf-8'>
-<title>Triggerbot Scan Report</title>
+<title>Johannes Schwein Triggerbot Scan</title>
 <style>
 body { font-family: Arial; background:#111; color:#eee; padding:20px; }
 h1 { color:#ff4444; }
@@ -141,7 +142,7 @@ a { color:#7ec0ff; text-decoration:none; }
 </style>
 </head>
 <body>
-<h1>Triggerbot Scan Report</h1>
+<h1>Johannes Schwein Triggerbot Scan</h1>
 <div class='summary'>
 <p><strong>Scan gestartet:</strong> $startTime<br/>
 <strong>Scan beendet:</strong> $endTime<br/>
@@ -149,7 +150,7 @@ a { color:#7ec0ff; text-decoration:none; }
 <strong>Gefundene verdächtige Prozesse:</strong> $($procFindings.Count)<br/>
 </p>
 </div>
-<h2 class='section-title'>Verdächtige Dateien (detailliert)</h2>
+<h2 class='section-title'>Verdächtige Dateien</h2>
 <table>
 <tr><th>#</th><th>Pfad</th><th>Score</th><th>Matches</th><th>Letzte Änderung</th></tr>
 "@
@@ -166,7 +167,7 @@ if ($fileFindings -and $fileFindings.Count -gt 0) {
 
 $procTableHeader = @"
 </table>
-<h2 class='section-title'>Verdächtige Prozesse</h2>
+<h2 class='section-title'>Verdächtige Prozesse (sortiert nach Score)</h2>
 <table>
 <tr><th>#</th><th>PID</th><th>Name</th><th>Score</th><th>Matches</th><th>CommandLine</th></tr>
 "@
@@ -182,7 +183,6 @@ if ($procFindings -and $procFindings.Count -gt 0) {
     }
 } else { $procRows = "<tr><td colspan='6'>Keine verdächtigen Prozesse gefunden</td></tr>`n" }
 
-# Extra Übersicht nur Dateinamen
 $fileNameSummary = @"
 </table>
 <h2 class='section-title'>Verdächtige Dateinamen Übersicht</h2>
