@@ -7,7 +7,6 @@ Write-Host -ForegroundColor Red "    \ \ \   / /\/__\// / /\ / _ \ __/ _ \/ __| 
 Write-Host -ForegroundColor Red " /\_/ /\ \ / / / \/  \/ /_//  __/ ||  __/ (__| |_ "
 Write-Host -ForegroundColor Red " \___/\__/ \/  \_____/___,' \___|\__\___|\___|\__|"
 Write-Host -ForegroundColor Red "                                                  "
-Write-Host -ForegroundColor Red "              Made by Neight01                    "
 Write-Host ""
 Start-Sleep -Seconds 5
 Clear-Host
@@ -39,7 +38,9 @@ function Score-Matches {
 function Get-AllDriveRoots {
     $roots = @()
     $drives = Get-PSDrive -PSProvider FileSystem
-    foreach ($d in $drives) { if (Test-Path $d.Root) { $roots += $d.Root } }
+    foreach ($d in $drives) {
+        if (Test-Path $d.Root) { $roots += $d.Root }
+    }
     return $roots
 }
 
@@ -49,32 +50,33 @@ function Scan-Files-OnRoots {
     foreach ($root in $Roots) {
         Write-Host "Durchsuche $root ..." -ForegroundColor Yellow
         try {
-            $enumerator = [System.IO.Directory]::EnumerateFiles($root, '*.py', [System.IO.SearchOption]::AllDirectories) +
-                          [System.IO.Directory]::EnumerateFiles($root, '*.pyw', [System.IO.SearchOption]::AllDirectories)
-        } catch { continue }
-
-        foreach ($file in $enumerator) {
-            try { $info = Get-Item -LiteralPath $file -ErrorAction SilentlyContinue } catch { continue }
-
+            $files = Get-ChildItem -Path $root -Recurse -ErrorAction SilentlyContinue -Force -Include *.py,*.pyw
+        } catch {
+            continue
+        }
+        foreach ($f in $files) {
             try {
-                $matches = Select-String -Path $file -Pattern ($Signatures | ForEach-Object { $_.regex }) -AllMatches -ErrorAction SilentlyContinue
-                if ($matches.Count -gt 0) {
-                    $foundPatterns = $matches | Select-Object -ExpandProperty Pattern -Unique
-                    $matchedSigs = @()
-                    foreach ($p in $Signatures) { foreach ($fp in $foundPatterns) { if ($fp -eq $p.regex) { $matchedSigs += $p; break } } }
-                    if ($matchedSigs.Count -gt 0) {
-                        $score = Score-Matches -MatchedSignatures $matchedSigs
-                        $entry = [PSCustomObject]@{
-                            Type = 'File'
-                            Path = $file
-                            Score = $score
-                            Matches = ($matchedSigs | ForEach-Object { $_.regex }) -join '; '
-                            LastWrite = $info.LastWriteTime
-                        }
-                        $results += $entry
-                    }
+                $content = Get-Content -LiteralPath $f.FullName -ErrorAction Stop -Raw
+            } catch {
+                continue
+            }
+            $matched = @()
+            foreach ($sig in $Signatures) {
+                try {
+                    if ($content -match $sig.regex) { $matched += $sig }
+                } catch { }
+            }
+            if ($matched.Count -gt 0) {
+                $score = Score-Matches -MatchedSignatures $matched
+                $entry = [PSCustomObject]@{
+                    Type = 'File'
+                    Path = $f.FullName
+                    Score = $score
+                    Matches = ($matched | ForEach-Object { $_.regex }) -join '; '
+                    LastWrite = $f.LastWriteTime
                 }
-            } catch { }
+                $results += $entry
+            }
         }
     }
     return $results
@@ -82,26 +84,51 @@ function Scan-Files-OnRoots {
 
 function Scan-Processes {
     $procResults = @()
-    try { $pyProcs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^(python|pythonw)(\.exe)?$' } } catch { return $procResults }
+    try {
+        $pyProcs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.Name -match '^(python|pythonw)(\.exe)?$'
+        }
+    } catch {
+        return $procResults
+    }
     foreach ($p in $pyProcs) {
-        $cmd = $p.CommandLine; $matched = @()
-        foreach ($sig in $Signatures) { try { if ($cmd -and ($cmd -match $sig.regex)) { $matched += $sig } } catch { } }
-        if ($matched.Count -eq 0 -and $cmd -match '\.py') {
-            $scriptPath = ($cmd -split '\s+' | Where-Object { $_ -match '\.py$' }) | Select-Object -First 1
-            if ($scriptPath) {
-                try {
-                    $abs = if (Test-Path $scriptPath) { $scriptPath } else { Join-Path -Path (Split-Path -Parent $p.ExecutablePath) -ChildPath $scriptPath }
-                    if (Test-Path $abs) {
-                        $content = Get-Content -LiteralPath $abs -Raw -ErrorAction SilentlyContinue
-                        foreach ($sig in $Signatures) { try { if ($content -match $sig.regex) { $matched += $sig } } catch { } }
-                    }
-                } catch { }
+        $cmd = $p.CommandLine
+        $matched = @()
+        foreach ($sig in $Signatures) {
+            try {
+                if ($cmd -and ($cmd -match $sig.regex)) { $matched += $sig }
+            } catch { }
+        }
+        if ($matched.Count -eq 0) {
+            if ($p.CommandLine -and ($p.CommandLine -match '\.py')) {
+                $scriptPath = ($p.CommandLine -split '\s+' | Where-Object { $_ -match '\.py$' }) | Select-Object -First 1
+                if ($scriptPath) {
+                    try {
+                        $abs = $scriptPath
+                        if (-not (Test-Path $abs) -and $p.ExecutablePath) {
+                            $abs = Join-Path -Path (Split-Path -Parent $p.ExecutablePath) -ChildPath $scriptPath
+                        }
+                        if (Test-Path $abs) {
+                            $content = Get-Content -LiteralPath $abs -Raw -ErrorAction SilentlyContinue
+                            foreach ($sig in $Signatures) {
+                                try {
+                                    if ($content -match $sig.regex) { $matched += $sig }
+                                } catch { }
+                            }
+                        }
+                    } catch { }
+                }
             }
         }
         if ($matched.Count -gt 0) {
             $score = Score-Matches -MatchedSignatures $matched
             $entry = [PSCustomObject]@{
-                Type = 'Process'; PID = $p.ProcessId; Name = $p.Name; CommandLine = $cmd; Score = $score; Matches = ($matched | ForEach-Object { $_.regex }) -join '; '
+                Type = 'Process'
+                PID = $p.ProcessId
+                Name = $p.Name
+                CommandLine = $cmd
+                Score = $score
+                Matches = ($matched | ForEach-Object { $_.regex }) -join '; '
             }
             $procResults += $entry
         }
@@ -109,19 +136,21 @@ function Scan-Processes {
     return $procResults
 }
 
-Write-Host "Starte Johannes Schwein Triggerbot-Detect" -ForegroundColor Cyan
-Write-Host "Startzeit: $(Get-Date -Format u)" -ForegroundColor Cyan
+$startTime = Get-Date
+Write-Host "Starte Heuristischen Triggerbot-Scan" -ForegroundColor Cyan
+Write-Host "Startzeit: $startTime" -ForegroundColor Cyan
 
 $roots = Get-AllDriveRoots
 $fileFindings = Scan-Files-OnRoots -Roots $roots
 $procFindings = Scan-Processes
-$all = $fileFindings + $procFindings
 
+$all = $fileFindings + $procFindings
 if ($all.Count -eq 0) {
     Write-Host "Keine verdächtigen Triggerbot-Signaturen gefunden." -ForegroundColor Green
 } else {
     $sorted = $all | Sort-Object -Property @{Expression='Score';Descending=$true}, @{Expression='Type';Descending=$false}
-    Write-Host ""; Write-Host "Gefundene verdächtige Objekte (nach Score sortiert):" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Gefundene verdächtige Objekte (nach Score sortiert):" -ForegroundColor Cyan
     $i = 1
     foreach ($s in $sorted) {
         Write-Host "[$i] Type: $($s.Type)  Score: $($s.Score)  Path/PID: $($s.Path -or $s.PID)" -ForegroundColor Magenta
@@ -130,27 +159,109 @@ if ($all.Count -eq 0) {
         if ($s.Type -eq 'File') { Write-Host "     LastWrite: $($s.LastWrite)" }
         $i++
     }
-
-    $htmlPath = Join-Path $env:TEMP "triggerbot_scan_report.html"
-    $html = "<html><head><title>Triggerbot Scan Report</title><style>
-        body{font-family:Arial;background:#1e1e1e;color:white;}
-        table{border-collapse:collapse;width:100%;}
-        th,td{border:1px solid #555;padding:5px;text-align:left;}
-        th{background:#333;} tr:nth-child(even){background:#2e2e2e;}
-        .score-high{color:red;font-weight:bold;}
-    </style></head><body><h2>Triggerbot Scan Report - $(Get-Date)</h2><table><tr><th>#</th><th>Type</th><th>Score</th><th>Path/PID</th><th>Matches</th><th>LastWrite / CommandLine</th></tr>"
-
-    $j = 1
-    foreach ($s in $sorted) {
-        $scoreClass = if ($s.Score -ge 5) { "score-high" } else { "" }
-        $details = if ($s.Type -eq 'File') { $s.LastWrite } else { $s.CommandLine }
-        $html += "<tr class='$scoreClass'><td>$j</td><td>$($s.Type)</td><td>$($s.Score)</td><td>$($s.Path -or $s.PID)</td><td>$($s.Matches)</td><td>$details</td></tr>"
-        $j++
-    }
-    $html += "</table></body></html>"
-    $html | Out-File -FilePath $htmlPath -Encoding UTF8
-    Write-Host "HTML Report gespeichert in: $htmlPath" -ForegroundColor Green
 }
 
+$endTime = Get-Date
 Write-Host ""
-Write-Host "Scan beendet: $(Get-Date -Format u)" -ForegroundColor Cyan
+Write-Host "Scan beendet: $endTime" -ForegroundColor Cyan
+
+$defaultName = "Triggerbot_Scan_Report_{0:yyyyMMdd_HHmmss}.html" -f $endTime
+$desktop = [Environment]::GetFolderPath('Desktop')
+$defaultPath = Join-Path $desktop $defaultName
+$saveInput = Read-Host "Pfad für HTML-Report eingeben oder Enter für Standard ($defaultPath)"
+if ([string]::IsNullOrWhiteSpace($saveInput)) { $reportPath = $defaultPath } else { $reportPath = $saveInput }
+
+$drivesList = ($roots -join ', ')
+$totalFiles = if ($fileFindings) { $fileFindings.Count } else { 0 }
+$totalProcs = if ($procFindings) { $procFindings.Count } else { 0 }
+$totalFindings = $totalFiles + $totalProcs
+
+$htmlHeader = @"
+<!doctype html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>Triggerbot Scan Report</title>
+<style>
+body { font-family: Arial, Helvetica, sans-serif; background:#111; color:#eee; padding:20px; }
+h1 { color:#ff4444; }
+table { border-collapse: collapse; width:100%; margin-bottom:20px; }
+th, td { border: 1px solid #444; padding:8px; text-align:left; }
+th { background:#222; color:#fff; }
+tr:nth-child(even) { background:#1a1a1a; }
+a { color:#7ec0ff; text-decoration:none; }
+.summary { margin-bottom:20px; padding:10px; background:#0f0f0f; border:1px solid #333; }
+.section-title { color:#9ad68b; }
+</style>
+</head>
+<body>
+<h1>Triggerbot Scan Report</h1>
+<div class='summary'>
+<p><strong>Scan gestartet:</strong> $startTime<br/>
+<strong>Scan beendet:</strong> $endTime<br/>
+<strong>Gelaufene Laufwerke:</strong> $drivesList<br/>
+<strong>Gefundene verdächtige Dateien:</strong> $totalFiles<br/>
+<strong>Gefundene verdächtige Prozesse:</strong> $totalProcs<br/>
+<strong>Gesamtverdachtsfälle:</strong> $totalFindings</p>
+</div>
+"@
+
+$fileTableHeader = @"
+<h2 class='section-title'>Verdächtige Dateien</h2>
+<table>
+<tr><th>#</th><th>Dateipfad</th><th>Score</th><th>Matches</th><th>Letzte Änderung</th></tr>
+"@
+
+$fileRows = ""
+if ($fileFindings -and $fileFindings.Count -gt 0) {
+    $n = 1
+    foreach ($f in $fileFindings) {
+        $linkPath = 'file:///' + ($f.Path -replace '\\','/') -replace ' ','%20'
+        $escapedMatches = [System.Web.HttpUtility]::HtmlEncode($f.Matches)
+        $fileRows += "<tr><td>$n</td><td><a href='$linkPath'>$($f.Path)</a></td><td>$($f.Score)</td><td>$escapedMatches</td><td>$($f.LastWrite)</td></tr>`n"
+        $n++
+    }
+} else {
+    $fileRows = "<tr><td colspan='5'>Keine verdächtigen Dateien gefunden</td></tr>`n"
+}
+
+$fileTableFooter = "</table>"
+
+$procTableHeader = @"
+<h2 class='section-title'>Verdächtige Prozesse</h2>
+<table>
+<tr><th>#</th><th>PID</th><th>Name</th><th>Score</th><th>Matches</th><th>CommandLine</th></tr>
+"@
+
+$procRows = ""
+if ($procFindings -and $procFindings.Count -gt 0) {
+    $n = 1
+    foreach ($p in $procFindings) {
+        $escapedMatches = [System.Web.HttpUtility]::HtmlEncode($p.Matches)
+        $escapedCmd = [System.Web.HttpUtility]::HtmlEncode($p.CommandLine)
+        $procRows += "<tr><td>$n</td><td>$($p.PID)</td><td>$($p.Name)</td><td>$($p.Score)</td><td>$escapedMatches</td><td><code>$escapedCmd</code></td></tr>`n"
+        $n++
+    }
+} else {
+    $procRows = "<tr><td colspan='6'>Keine verdächtigen Prozesse gefunden</td></tr>`n"
+}
+
+$footer = @"
+</table>
+<hr/>
+<p>Report automatisch erstellt am $endTime</p>
+</body>
+</html>
+"@
+
+$fullHtml = $htmlHeader + $fileTableHeader + $fileRows + $fileTableFooter + $procTableHeader + $procRows + $footer
+
+try {
+    $fullHtml | Out-File -FilePath $reportPath -Encoding UTF8
+    Write-Host ""
+    Write-Host "HTML-Report gespeichert: $reportPath" -ForegroundColor Green
+    Write-Host "Öffne Report..." -ForegroundColor Cyan
+    Start-Process -FilePath $reportPath
+} catch {
+    Write-Host "Fehler beim Speichern des Reports: $_" -ForegroundColor Red
+}
