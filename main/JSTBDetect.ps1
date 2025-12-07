@@ -7,7 +7,7 @@ Write-Host -ForegroundColor Red "    \ \ \   / /\/__\// / /\ / _ \ __/ _ \/ __| 
 Write-Host -ForegroundColor Red " /\_/ /\ \ / / / \/  \/ /_//  __/ ||  __/ (__| |_ "
 Write-Host -ForegroundColor Red " \___/\__/ \/  \_____/___,' \___|\__\___|\___|\__|"
 Write-Host -ForegroundColor Red "                                                  "
-Write-Host -ForegroundColor Red "                 Made by Neight01                 "
+Write-Host -ForegroundColor Red "                 Made by Johannes Schwein         "
 Write-Host ""
 Start-Sleep -Seconds 5
 Clear-Host
