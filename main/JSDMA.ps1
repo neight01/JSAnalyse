@@ -25,14 +25,14 @@ $installDate = [DateTimeOffset]::FromUnixTimeSeconds($installDateRaw).DateTime
 # PnP Devices (über WMI / CIM)
 # ------------------------------
 function Parse-VIDPID($text) {
-    $vid=""; $devPID=""
+    $vid=""; $devicePID=""
     if ($text -match "VID_([0-9A-F]{4})") { $vid=$Matches[1] }
-    if ($text -match "PID_([0-9A-F]{4})") { $devPID=$Matches[1] }
+    if ($text -match "PID_([0-9A-F]{4})") { $devicePID=$Matches[1] }
     return @{
         VID = $vid
-        PID = $devPID
-        DeviceHunt = if ($vid -and $devPID) {
-            "https://devicehunt.com/view/type/usb/vendor/$vid/device/$devPID"
+        Device_PID = $devicePID
+        DeviceHunt = if ($vid -and $devicePID) {
+            "https://devicehunt.com/view/type/usb/vendor/$vid/device/$devicePID"
         } else { "" }
     }
 }
@@ -47,13 +47,13 @@ $PnPDevices = Get-CimInstance Win32_PnPEntity | ForEach-Object {
         Status = if ($_.Status) { $_.Status } else { "Unknown" }
         InstanceId = $_.PNPDeviceID
         VID = $ids.VID
-        DevicePID = $ids.PID
+        Device_PID = $ids.Device_PID
         DeviceHunt = if ($ids.DeviceHunt) { "<a href='$($ids.DeviceHunt)' target='_blank'>Lookup</a>" } else { "-" }
     }
 }
 
 # ------------------------------
-# Kernel Drivers ONLY
+# Kernel Drivers
 # ------------------------------
 Print-Progress "Scanne Kernel-Treiber..."
 $KernelDrivers = Get-CimInstance Win32_SystemDriver |
@@ -95,7 +95,7 @@ foreach ($root in $usbRoots) {
                 Manufacturer = if ($p.Mfg) { $p.Mfg } else { "Unknown" }
                 Serial = $_.Name
                 VID = $ids.VID
-                DevicePID = $ids.PID
+                Device_PID = $ids.Device_PID
                 DeviceHunt = if ($ids.DeviceHunt) { "<a href='$($ids.DeviceHunt)' target='_blank'>Lookup</a>" } else { "-" }
             }
         } catch {}
