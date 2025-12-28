@@ -1,119 +1,174 @@
-# ===============================
-# JSTBDetect.ps1 (PS 5.1 SAFE)
-# ===============================
+Clear-Host
+Write-Host ""
+Write-Host -ForegroundColor Red "   __  __  _____  ___    ___     _            _   "
+Write-Host -ForegroundColor Red "   \ \/ _\/__   \/ __\  /   \___| |_ ___  ___| |_ "
+Write-Host -ForegroundColor Red "    \ \ \   / /\/__\// / /\ / _ \ __/ _ \/ __| __|"
+Write-Host -ForegroundColor Red " /\_/ /\ \ / / / \/  \/ /_//  __/ ||  __/ (__| |_ "
+Write-Host -ForegroundColor Red " \___/\__/ \/  \_____/___,' \___|\__\___|\___|\__|"
+Write-Host -ForegroundColor Red "                 Made by Johannes Schwein         "
+Write-Host ""
+Start-Sleep 3
+Clear-Host
 
-$ScanPath = [Environment]::GetFolderPath("Desktop")
-
-$Extensions = @(".js", ".txt", ".json", ".ps1", ".py")
-
-$CheatKeywordsGeneral = @(
-    "triggerbot",
-    "aimbot",
-    "mouse_event",
-    "SendInput",
-    "SetCursorPos",
-    "GetAsyncKeyState",
-    "pyautogui",
-    "pynput",
-    "mouse.move",
-    "mouse.click"
+# ================= SIGNATURES (PY + TXT) =================
+$CodeSignatures = @(
+    @{ regex = 'pyautogui\.(mouseDown|mouseUp|click|moveTo)'; weight = 3 },
+    @{ regex = 'GetPixel\(|gdi32|GetDC\('; weight = 3 },
+    @{ regex = 'pynput\.mouse|pynput\.keyboard'; weight = 3 },
+    @{ regex = 'mouseDown\(|mouseUp\('; weight = 2 },
+    @{ regex = 'time\.sleep\(|random\.uniform\('; weight = 1 },
+    @{ regex = 'pyautogui\.pixel|screenshot'; weight = 2 }
 )
 
-$CheatKeywordsConfig = @(
+# ================= CONFIG KEYWORDS (JSON + TXT) =================
+$ConfigKeywords = @(
+    "aimbot",
     "smoothing",
     "esp",
     "skeleton",
-    "fov",
-    "aim_key",
     "bone",
-    "head",
-    "chest"
+    "bones",
+    "fov",
+    "triggerbot",
+    "silent",
+    "recoil",
+    "rcs"
 )
 
-$Results = @()
-
-function Get-SafeText {
-    param ($Path)
-    try {
-        return Get-Content $Path -Raw -ErrorAction Stop
-    } catch {
-        return ""
-    }
+# ================= UTILS =================
+function Get-AllRoots {
+    Get-PSDrive -PSProvider FileSystem | Where-Object { Test-Path $_.Root } | ForEach-Object { $_.Root }
 }
 
-Get-ChildItem -Path $ScanPath -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
-    $Extensions -contains $_.Extension.ToLower()
-} | ForEach-Object {
+function Score-Matches($matches) {
+    ($matches | Measure-Object weight -Sum).Sum
+}
 
-    $File = $_
-    $Content = Get-SafeText $File.FullName
-    if ($Content -eq "") { return }
+# ================= FILE SCAN =================
+function Scan-Files {
+    param($Roots)
 
-    foreach ($kw in $CheatKeywordsGeneral) {
-        if ($Content -match [regex]::Escape($kw)) {
-            $Results += [PSCustomObject]@{
-                Type = "Cheat Keyword"
-                Name = $File.Name
-                Path = $File.FullName
-                Keyword = $kw
+    $results = @()
+
+    foreach ($root in $Roots) {
+        Write-Host "Scanne $root ..." -ForegroundColor Yellow
+
+        $files = Get-ChildItem -Path $root -Recurse -Force -ErrorAction SilentlyContinue `
+            -Include *.py,*.pyw,*.txt,*.json
+
+        foreach ($file in $files) {
+
+            try {
+                $content = Get-Content $file.FullName -Raw -ErrorAction Stop
+            } catch { continue }
+
+            $ext = $file.Extension.ToLower()
+            $matches = @()
+
+            # -------- CODE DETECTION (.py + .txt)
+            if ($ext -in @(".py", ".pyw", ".txt")) {
+                foreach ($sig in $CodeSignatures) {
+                    if ($content -match $sig.regex) {
+                        $matches += $sig
+                    }
+                }
             }
-        }
-    }
 
-    if ($File.Extension -in @(".json", ".txt")) {
-        foreach ($kw in $CheatKeywordsConfig) {
-            if ($Content -match [regex]::Escape($kw)) {
-                $Results += [PSCustomObject]@{
-                    Type = "Cheat Config"
-                    Name = $File.Name
-                    Path = $File.FullName
-                    Keyword = $kw
+            # -------- CONFIG DETECTION (.json + .txt)
+            if ($ext -in @(".json", ".txt")) {
+                foreach ($key in $ConfigKeywords) {
+                    if ($content -match "(?i)\b$key\b") {
+                        $matches += @{ regex = "config:$key"; weight = 2 }
+                        break
+                    }
+                }
+            }
+
+            if ($matches.Count -gt 0) {
+                $results += [PSCustomObject]@{
+                    Type      = "File"
+                    Path      = $file.FullName
+                    FileName  = $file.Name
+                    Extension = $ext
+                    Score     = Score-Matches $matches
+                    Matches   = ($matches.regex -join "; ")
+                    LastWrite = $file.LastWriteTime
                 }
             }
         }
     }
+
+    return $results
 }
 
-# ===============================
-# HTML REPORT
-# ===============================
+# ================= PROCESS SCAN =================
+function Scan-Processes {
 
-$html = @"
-<html>
-<head>
-<title>JSTB Detect Report</title>
-<style>
-body { font-family: Arial; background:#111; color:#eee }
-table { border-collapse: collapse; width:100% }
-th,td { border:1px solid #555; padding:6px }
-th { background:#222 }
-tr:nth-child(even){background:#1b1b1b}
-</style>
-</head>
-<body>
-<h2>JSTB Detection Report</h2>
-<table>
-<tr>
-<th>Type</th>
-<th>File</th>
-<th>Keyword</th>
-</tr>
-"@
+    $results = @()
+    $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^pythonw?\.exe$' }
 
-foreach ($r in $Results) {
-    $fileName = ""
-    if ($r.Path -ne $null -and $r.Path -ne "") {
-        $fileName = $r.Path
-    } else {
-        $fileName = $r.Name
+    foreach ($p in $procs) {
+        $cmd = $p.CommandLine
+        $matches = @()
+
+        foreach ($sig in $CodeSignatures) {
+            if ($cmd -match $sig.regex) {
+                $matches += $sig
+            }
+        }
+
+        if ($matches.Count -gt 0) {
+            $results += [PSCustomObject]@{
+                Type = "Process"
+                PID  = $p.ProcessId
+                Name = $p.Name
+                Score = Score-Matches $matches
+                Matches = ($matches.regex -join "; ")
+                CommandLine = $cmd
+            }
+        }
     }
 
-    $html += "<tr><td>$($r.Type)</td><td>$fileName</td><td>$($r.Keyword)</td></tr>"
+    return $results
+}
+
+# ================= MAIN =================
+$start = Get-Date
+Write-Host "Starte Scan..." -ForegroundColor Cyan
+
+$roots = Get-AllRoots
+$fileResults = Scan-Files $roots
+$procResults = Scan-Processes
+
+$all = $fileResults + $procResults | Sort-Object Score -Descending
+
+if ($all.Count -eq 0) {
+    Write-Host "Keine verdächtigen Dateien oder Prozesse gefunden." -ForegroundColor Green
+    return
+}
+
+# ================= REPORT =================
+$desktop = [Environment]::GetFolderPath("Desktop")
+$path = Join-Path $desktop ("Triggerbot_Report_{0:yyyyMMdd_HHmmss}.html" -f (Get-Date))
+
+$html = @"
+<html><head><style>
+body{background:#111;color:#eee;font-family:Arial}
+table{border-collapse:collapse;width:100%}
+th,td{border:1px solid #444;padding:6px}
+th{background:#222}
+</style></head><body>
+<h1>Triggerbot Scan Report</h1>
+<p>Start: $start<br>Ende: $(Get-Date)</p>
+<table>
+<tr><th>Typ</th><th>Pfad / Prozess</th><th>Score</th><th>Matches</th></tr>
+"@
+
+foreach ($r in $all) {
+    $html += "<tr><td>$($r.Type)</td><td>$($r.Path ?? $r.Name)</td><td>$($r.Score)</td><td>$($r.Matches)</td></tr>"
 }
 
 $html += "</table></body></html>"
-
-$OutFile = "$env:TEMP\JSTBDetect_Report.html"
-$html | Out-File -Encoding UTF8 $OutFile
-
-Start-Process $OutFile
+$html | Out-File $path -Encoding UTF8
+Start-Process $path
