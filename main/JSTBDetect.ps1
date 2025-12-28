@@ -34,17 +34,7 @@ $PowerShellSignatures = @(
 
 # ================= CONFIG KEYWORDS =================
 $ConfigKeywords = @(
-    "aimbot",
-    "triggerbot",
-    "smoothing",
-    "esp",
-    "skeleton",
-    "bone",
-    "bones",
-    "fov",
-    "silent",
-    "recoil",
-    "rcs"
+    "aimbot","triggerbot","smoothing","esp","skeleton","bone","bones","fov","silent","recoil","rcs"
 )
 
 # ================= UTILS =================
@@ -53,7 +43,11 @@ function Get-AllRoots {
 }
 
 function Get-Score($matches) {
-    ($matches | Measure-Object weight -Sum).Sum
+    $sum = 0
+    foreach ($m in $matches) {
+        if ($m.ContainsKey("weight")) { $sum += $m.weight }
+    }
+    return $sum
 }
 
 # ================= FILE SCAN =================
@@ -65,37 +59,35 @@ function Scan-Files {
     foreach ($root in $Roots) {
         Write-Host "Scanne $root ..." -ForegroundColor Yellow
 
-        $files = Get-ChildItem -Path $root -Recurse -Force -ErrorAction SilentlyContinue `
-            -Include *.py,*.pyw,*.ps1,*.txt,*.json
+        $files = Get-ChildItem -Path $root -Recurse -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -match "(\.py|\.pyw|\.ps1|\.txt|\.json)$" }
 
         foreach ($file in $files) {
 
-            try { $content = Get-Content $file.FullName -Raw -ErrorAction Stop }
-            catch { continue }
+            try { $content = Get-Content $file.FullName -Raw -ErrorAction Stop } catch { continue }
 
             $ext = $file.Extension.ToLower()
             $matches = @()
 
             # ---- PYTHON CODE
-            if ($ext -in @(".py", ".pyw", ".txt")) {
+            if ($ext -eq ".py" -or $ext -eq ".pyw" -or $ext -eq ".txt") {
                 foreach ($sig in $PythonSignatures) {
                     if ($content -match $sig.regex) { $matches += $sig }
                 }
             }
 
             # ---- POWERSHELL CODE
-            if ($ext -in @(".ps1", ".txt")) {
+            if ($ext -eq ".ps1" -or $ext -eq ".txt") {
                 foreach ($sig in $PowerShellSignatures) {
                     if ($content -match $sig.regex) { $matches += $sig }
                 }
             }
 
             # ---- CONFIG FILES
-            if ($ext -in @(".json", ".txt")) {
+            if ($ext -eq ".json" -or $ext -eq ".txt") {
                 foreach ($key in $ConfigKeywords) {
                     if ($content -match "(?i)\b$key\b") {
                         $matches += @{ regex = "config:$key"; weight = 2 }
-                        break
                     }
                 }
             }
@@ -107,7 +99,7 @@ function Scan-Files {
                     FileName  = $file.Name
                     Extension = $ext
                     Score     = Get-Score $matches
-                    Matches   = ($matches.regex -join "; ")
+                    Matches   = ($matches | ForEach-Object { $_.regex } | Sort-Object -Unique -join "; ")
                     Modified  = $file.LastWriteTime
                 }
             }
@@ -119,7 +111,6 @@ function Scan-Files {
 # ================= PROCESS SCAN =================
 function Scan-Processes {
     $results = @()
-
     $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match '^(python|pythonw|powershell|pwsh)\.exe$' }
 
@@ -137,7 +128,7 @@ function Scan-Processes {
                 PID         = $p.ProcessId
                 Name        = $p.Name
                 Score       = Get-Score $matches
-                Matches     = ($matches.regex -join "; ")
+                Matches     = ($matches | ForEach-Object { $_.regex } | Sort-Object -Unique -join "; ")
                 CommandLine = $cmd
             }
         }
@@ -152,7 +143,6 @@ Write-Host "Starte Triggerbot Scan..." -ForegroundColor Cyan
 $roots = Get-AllRoots
 $fileResults = Scan-Files $roots
 $procResults = Scan-Processes
-
 $all = $fileResults + $procResults | Sort-Object Score -Descending
 
 if ($all.Count -eq 0) {
