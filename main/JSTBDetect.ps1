@@ -15,8 +15,8 @@ $PythonSignatures = @(
     @{ regex = 'pyautogui\.(mouseDown|mouseUp|click|moveTo)'; weight = 3 },
     @{ regex = 'pynput\.mouse|pynput\.keyboard'; weight = 3 },
     @{ regex = 'GetPixel\(|GetDC\('; weight = 3 },
-    @{ regex = 'time\.sleep\('; weight = 1 },
-    @{ regex = 'mouseDown\(|mouseUp\('; weight = 2 }
+    @{ regex = 'mouseDown\(|mouseUp\('; weight = 2 },
+    @{ regex = 'time\.sleep\('; weight = 1 }
 )
 
 # ================= POWERSHELL SIGNATURES =================
@@ -49,11 +49,17 @@ $ConfigKeywords = @(
 
 # ================= UTILS =================
 function Get-AllRoots {
-    Get-PSDrive -PSProvider FileSystem | Where-Object { Test-Path $_.Root } | ForEach-Object { $_.Root }
+    $roots = @()
+    Get-PSDrive -PSProvider FileSystem | ForEach-Object {
+        if (Test-Path $_.Root) { $roots += $_.Root }
+    }
+    return $roots
 }
 
 function Get-Score($matches) {
-    ($matches | Measure-Object weight -Sum).Sum
+    $sum = 0
+    foreach ($m in $matches) { $sum += $m.weight }
+    return $sum
 }
 
 # ================= FILE SCAN =================
@@ -70,28 +76,29 @@ function Scan-Files {
 
         foreach ($file in $files) {
 
-            try { $content = Get-Content $file.FullName -Raw -ErrorAction Stop }
-            catch { continue }
+            try {
+                $content = Get-Content -LiteralPath $file.FullName -Raw -ErrorAction Stop
+            } catch { continue }
 
             $ext = $file.Extension.ToLower()
             $matches = @()
 
             # ---- PYTHON CODE
-            if ($ext -in @(".py", ".pyw", ".txt")) {
+            if ($ext -eq ".py" -or $ext -eq ".pyw" -or $ext -eq ".txt") {
                 foreach ($sig in $PythonSignatures) {
                     if ($content -match $sig.regex) { $matches += $sig }
                 }
             }
 
             # ---- POWERSHELL CODE
-            if ($ext -in @(".ps1", ".txt")) {
+            if ($ext -eq ".ps1" -or $ext -eq ".txt") {
                 foreach ($sig in $PowerShellSignatures) {
                     if ($content -match $sig.regex) { $matches += $sig }
                 }
             }
 
-            # ---- CONFIG FILES
-            if ($ext -in @(".json", ".txt")) {
+            # ---- CONFIG KEYWORDS
+            if ($ext -eq ".json" -or $ext -eq ".txt") {
                 foreach ($key in $ConfigKeywords) {
                     if ($content -match "(?i)\b$key\b") {
                         $matches += @{ regex = "config:$key"; weight = 2 }
@@ -120,21 +127,23 @@ function Scan-Processes {
     $results = @()
 
     $procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '^(python|pythonw|powershell|pwsh)\.exe$' }
+        Where-Object {
+            $_.Name -match '^(python|pythonw|powershell|pwsh)\.exe$'
+        }
 
     foreach ($p in $procs) {
         $matches = @()
         $cmd = $p.CommandLine
 
-        foreach ($sig in $PythonSignatures + $PowerShellSignatures) {
+        foreach ($sig in ($PythonSignatures + $PowerShellSignatures)) {
             if ($cmd -match $sig.regex) { $matches += $sig }
         }
 
         if ($matches.Count -gt 0) {
             $results += [PSCustomObject]@{
                 Type        = "Process"
-                PID         = $p.ProcessId
                 Name        = $p.Name
+                PID         = $p.ProcessId
                 Score       = Get-Score $matches
                 Matches     = ($matches.regex -join "; ")
                 CommandLine = $cmd
@@ -146,7 +155,7 @@ function Scan-Processes {
 
 # ================= MAIN =================
 $start = Get-Date
-Write-Host "Starte Triggerbot Scan..." -ForegroundColor Cyan
+Write-Host "Starte JSTBDetect Scan..." -ForegroundColor Cyan
 
 $roots = Get-AllRoots
 $fileResults = Scan-Files $roots
@@ -161,25 +170,36 @@ if ($all.Count -eq 0) {
 
 # ================= REPORT =================
 $desktop = [Environment]::GetFolderPath("Desktop")
-$report = Join-Path $desktop ("Triggerbot_Report_{0:yyyyMMdd_HHmmss}.html" -f (Get-Date))
+$reportPath = Join-Path $desktop ("Triggerbot_Report_{0:yyyyMMdd_HHmmss}.html" -f (Get-Date))
 
 $html = @"
-<html><head><style>
-body{background:#111;color:#eee;font-family:Arial}
-table{border-collapse:collapse;width:100%}
-th,td{border:1px solid #444;padding:6px}
-th{background:#222}
-</style></head><body>
-<h1>Triggerbot / Cheat Scan Report</h1>
+<html>
+<head>
+<meta charset='utf-8'>
+<style>
+body { background:#111; color:#eee; font-family:Arial; }
+table { border-collapse:collapse; width:100%; }
+th,td { border:1px solid #444; padding:6px; }
+th { background:#222; }
+</style>
+</head>
+<body>
+<h1>JSTBDetect – Triggerbot / Cheat Scan</h1>
 <p>Scanstart: $start<br>Scanende: $(Get-Date)</p>
 <table>
-<tr><th>Typ</th><th>Pfad / Prozess</th><th>Score</th><th>Matches</th></tr>
+<tr><th>Typ</th><th>Ziel</th><th>Score</th><th>Matches</th></tr>
 "@
 
 foreach ($r in $all) {
-    $html += "<tr><td>$($r.Type)</td><td>$($r.Path ?? $r.Name)</td><td>$($r.Score)</td><td>$($r.Matches)</td></tr>"
+    if ($r.Type -eq "File") {
+        $target = $r.Path
+    } else {
+        $target = "$($r.Name) (PID $($r.PID))"
+    }
+
+    $html += "<tr><td>$($r.Type)</td><td>$target</td><td>$($r.Score)</td><td>$($r.Matches)</td></tr>"
 }
 
 $html += "</table></body></html>"
-$html | Out-File $report -Encoding UTF8
-Start-Process $report
+$html | Out-File -FilePath $reportPath -Encoding UTF8
+Start-Process $reportPath
