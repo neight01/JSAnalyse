@@ -48,7 +48,7 @@ function Scan-Files-OnRoots {
     $results = @()
     foreach ($root in $Roots) {
         Write-Host "Durchsuche $root ..." -ForegroundColor Yellow
-        try { $files = Get-ChildItem -Path $root -Recurse -ErrorAction SilentlyContinue -Force -Include *.py,*.pyw,*.txt } catch { continue }
+        try { $files = Get-ChildItem -Path $root -Recurse -ErrorAction SilentlyContinue -Force -Include *.py,*.pyw } catch { continue }
         foreach ($f in $files) {
             try { $content = Get-Content -LiteralPath $f.FullName -ErrorAction Stop -Raw } catch { continue }
             $matched = @()
@@ -210,5 +210,6 @@ try {
 } catch {
     Write-Host "Fehler beim Speichern des Reports: $_" -ForegroundColor Red
 }
+
 
 
